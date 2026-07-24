@@ -1,0 +1,210 @@
+# 食安团餐售后智能助手 — Docker Compose 部署
+#
+# ===== 常用命令 =====
+# 启动全部服务:      docker compose up -d
+# 首次/重新构建:      docker compose up -d --build
+# 查看日志:          docker compose logs -f
+# 查看状态:          docker compose ps
+# 停止全部:          docker compose down
+# 完全卸载(删数据):   docker compose down -v
+# 仅重建后端:        docker compose up -d --build backend
+# 仅重建前端:        docker compose up -d --build frontend
+# =====================
+
+services:
+  # ============================================================
+  #  PostgreSQL 16 — 业务数据库
+  # ============================================================
+  postgres:
+    image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${PG_DB:-food_safety}
+      POSTGRES_USER: ${PG_USER:-postgres}
+      POSTGRES_PASSWORD: ${PG_PASSWORD:-postgres}
+    expose:
+      - "5432"
+    volumes:
+      - pg_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${PG_USER:-postgres} -d ${PG_DB:-food_safety}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # ============================================================
+  #  Redis 7 — 会话缓存 / 限流 / 去重
+  # ============================================================
+  redis:
+    image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/library/redis:7-alpine
+    expose:
+      - "6379"
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-redis123}
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+      --save 900 1
+      --save 300 10
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis123}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # ============================================================
+  #  MinIO — 对象存储
+  # ============================================================
+  minio:
+    image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/quay.io/minio/minio:RELEASE.2025-07-23T15-54-02Z
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    expose:
+      - "9000"
+      - "9001"
+    volumes:
+      - minio_data:/data
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # ============================================================
+  #  Qdrant — 向量数据库
+  # ============================================================
+  qdrant:
+    image: swr.cn-north-4.myhuaweicloud.com/ddn-k8s/docker.io/qdrant/qdrant:v1.16.2
+    expose:
+      - "6333"
+      - "6334"
+    volumes:
+      - qdrant_data:/qdrant/storage
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # ============================================================
+  #  FastAPI 后端
+  # ============================================================
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    ports:
+      - "${BACKEND_PORT:-5002}:8000"
+    environment:
+      # API Keys
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY}
+      - SILICONFLOW_API_KEY=${SILICONFLOW_API_KEY}
+      # Multi-tenant
+      - DEFAULT_COMPANY_ID=${DEFAULT_COMPANY_ID:-1}
+      - COMPANY_ID=${COMPANY_ID:-1}
+      # LLM: DeepSeek official
+      - LLM_BASE_URL=${LLM_BASE_URL:-https://api.deepseek.com}
+      - LLM_MODEL=${LLM_MODEL:-deepseek-v4-flash}
+      - DEEPSEEK_BASE_URL=${LLM_BASE_URL:-https://api.deepseek.com}
+      - DEEPSEEK_MODEL=${LLM_MODEL:-deepseek-v4-flash}
+      # Embedding/Rerank: SiliconFlow
+      - EMBEDDING_BASE_URL=${EMBEDDING_BASE_URL:-https://api.siliconflow.cn/v1}
+      - EMBEDDING_MODEL=${EMBEDDING_MODEL:-BAAI/bge-large-zh-v1.5}
+      - RERANK_MODEL=${RERANK_MODEL:-BAAI/bge-reranker-v2-m3}
+      # PostgreSQL
+      - PG_HOST=postgres
+      - PG_PORT=5432
+      - PG_USER=${PG_USER:-postgres}
+      - PG_PASSWORD=${PG_PASSWORD:-postgres}
+      - PG_DB=${PG_DB:-food_safety}
+      # Redis
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-redis123}
+      # MinIO
+      - MINIO_ENDPOINT=minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY:-minioadmin}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY:-minioadmin}
+      - MINIO_BUCKET=${MINIO_BUCKET:-knowledge-base}
+      # Qdrant
+      - QDRANT_MODE=server
+      - QDRANT_HOST=qdrant
+      - QDRANT_PORT=6333
+      - QDRANT_COLLECTION=${QDRANT_COLLECTION:-food_safety_kb}
+      - QDRANT_DENSE_VECTOR_NAME=${QDRANT_DENSE_VECTOR_NAME:-dense}
+      - QDRANT_SPARSE_VECTOR_NAME=${QDRANT_SPARSE_VECTOR_NAME:-bm25}
+      - SPARSE_EMBEDDING_MODEL=${SPARSE_EMBEDDING_MODEL:-Qdrant/bm25}
+      # Knowledge base
+      - KB_ROOT=/app/knowledge_base
+      # JWT
+      - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
+      # Runtime
+      - WEB_CONCURRENCY=${WEB_CONCURRENCY:-2}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+      qdrant:
+        condition: service_started
+    volumes:
+      # 挂载知识库目录 (只读) — 默认使用项目同级 knowledge_base，可通过 KB_PATH 覆盖
+      - ${KB_PATH:-../knowledge_base}:/app/knowledge_base:ro
+      # 挂载评估数据集 (可选)
+      - ${DATA_PATH:-../data}:/app/data:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+    networks:
+      - app-network
+
+  # ============================================================
+  #  前端 — Nginx 静态资源 + API 反向代理
+  # ============================================================
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    ports:
+      - "${FRONTEND_PORT:-5001}:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost/ || exit 1"]
+      interval: 20s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    restart: unless-stopped
+    networks:
+      - app-network
+
+# ============================================================
+#  持久化卷
+# ============================================================
+volumes:
+  pg_data:
+  redis_data:
+  minio_data:
+  qdrant_data:
+
+# ============================================================
+#  共享网络
+# ============================================================
+networks:
+  app-network:
+    driver: bridge

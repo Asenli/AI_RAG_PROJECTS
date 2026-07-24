@@ -1,0 +1,89 @@
+# 食安团餐售后智能助手 — 非敏感配置
+# 敏感信息（API Key、密码等）请通过环境变量配置
+
+# === 多租户 ===
+tenant:
+  default_company_id: "1"
+
+# === LLM 服务 ===
+llm:
+  provider: deepseek
+  model: deepseek-v4-flash
+  base_url: https://api.deepseek.com
+  temperature: 0.3
+  max_tokens: 2048
+
+# === Embedding 服务（SiliconFlow）===
+embedding:
+  provider: siliconflow
+  model: BAAI/bge-large-zh-v1.5
+  base_url: https://api.siliconflow.cn/v1
+
+# === Rerank 服务（SiliconFlow）===
+rerank:
+  provider: siliconflow
+  model: BAAI/bge-reranker-v2-m3
+  top_n: 5
+
+# === 向量数据库（Qdrant）===
+qdrant:
+  mode: local                     # Windows: local | Docker: server
+  # server 模式配置（Docker 部署时使用）：
+  host: ${QDRANT_HOST:-localhost}
+  port: ${QDRANT_PORT:-6333}
+  collection_name: food_safety_kb
+  dimension: 1024                # bge-large-zh-v1.5 输出维度
+  dense_vector_name: dense
+  sparse_vector_name: bm25
+  sparse_embedding_model: Qdrant/bm25
+
+# === 检索参数 ===
+retrieval:
+  top_k: 20                       # 向量检索召回数
+  rerank_top_n: 5                 # Rerank 后保留数
+  score_threshold: 0.65           # 相似度阈值
+  fallback_threshold: 3           # 降级兜底触发数
+  dense_weight: 0.7               # Dense 召回权重说明；Qdrant RRF 融合时不直接使用
+  sparse_weight: 0.3              # BM25/Sparse 召回权重说明；Qdrant RRF 融合时不直接使用
+
+# === 三层记忆管理 ===
+memory:
+  short_term:
+    max_rounds: 5
+    session_ttl: 1209600          # 14天
+
+  medium_term:
+    compression_threshold: 5
+    summary_max_length: 500
+    incremental_compression: true
+    retention_days: 14
+
+  long_term:
+    extraction_on_session_close: true
+    max_facts_per_user: 50
+    fact_confidence_threshold: 0.3
+    frequent_question_top_n: 10
+    profile_update_interval_days: 7
+    keep_raw_conversation_days: 14
+
+# === 用户反馈 ===
+feedback:
+  auto_badcase_enabled: true
+  auto_badcase_rate_limit: 3
+  require_review_before_priority_update: true
+  priority_adjust_like: 0.1
+  priority_adjust_dislike: -0.3
+  priority_max: 5.0
+  priority_min: 1.0
+  consecutive_dislike_threshold: 3
+
+# === 权限 ===
+auth:
+  jwt_algorithm: HS256
+  token_expire_minutes: 1440      # 24小时
+
+# === 日志 ===
+logging:
+  level: INFO
+  trace_enabled: true
+  trace_retention_days: 90

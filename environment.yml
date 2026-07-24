@@ -1,0 +1,54 @@
+# 食安团餐售后智能助手 — Conda 环境配置
+# 创建: conda env create -f environment.yml
+# 更新: conda env update -f environment.yml
+name: food-safety-assistant
+channels:
+  - conda-forge
+  - defaults
+
+dependencies:
+  - python=3.11
+  - pip
+  - pip:
+      # ===== Web 框架 =====
+      - fastapi>=0.110.0
+      - "uvicorn[standard]>=0.27.0"
+      - python-multipart>=0.0.6
+      - aiofiles>=23.2.0
+
+      # ===== AI / RAG =====
+      - openai>=1.6.0
+      - langchain>=0.3.0
+      - langchain-community>=0.3.0
+      - langchain-core>=0.3.0
+
+      # ===== 数据库 =====
+      - sqlalchemy>=2.0.25
+      - asyncpg>=0.29.0
+      - psycopg2-binary>=2.9.9
+
+      # ===== 向量数据库 =====
+      - qdrant-client>=1.16.0
+      - fastembed>=0.6.0
+
+      # ===== 缓存 =====
+      - redis>=5.0.0
+
+      # ===== 对象存储 =====
+      - minio>=7.2.0
+
+      # ===== 配置 & 环境 =====
+      - pyyaml>=6.0
+      - pydantic>=2.5.0
+      - pydantic-settings>=2.1.0
+      - python-dotenv>=1.0.0
+
+      # ===== 认证 =====
+      - "python-jose[cryptography]>=3.3.0"
+
+      # ===== HTTP & 网络 =====
+      - httpx>=0.26.0
+      - requests>=2.31.0
+
+      # ===== 文档处理 =====
+      - markdown>=3.5.0

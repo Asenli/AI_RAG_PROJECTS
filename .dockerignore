@@ -1,0 +1,45 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+*.so
+env/
+venv/
+.venv/
+
+# Qdrant local (dev only, not needed in Docker)
+backend/qdrant_data/
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# Environment
+.env
+.env.local
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Git
+.git/
+.gitignore
+
+# CI/CD
+.github/
+
+# Logs
+*.log
+
+# Docs (not needed at runtime)
+docs/
+
+# Data (mounted at runtime)
+data/

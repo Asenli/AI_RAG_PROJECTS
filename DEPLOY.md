@@ -121,6 +121,12 @@ $env:PYTHONPATH="D:\AI_Projects\food-safety-assistant\backend"
 python -m scripts.ingest --recreate --company-id 1
 ```
 
+默认读取当前项目内目录：
+
+```text
+D:\AI_Projects\food-safety-assistant\knowledge_base
+```
+
 Docker 入库：
 
 ```bash
@@ -139,7 +145,7 @@ python -m scripts.ingest --dry-run --company-id 1
 Docker 使用宿主知识库目录：
 
 ```bash
-KB_PATH=/opt/food-safety/knowledge_base
+KB_PATH=./knowledge_base
 DATA_PATH=/opt/food-safety/data
 ```
 

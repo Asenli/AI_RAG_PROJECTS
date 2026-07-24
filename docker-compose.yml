@@ -157,8 +157,8 @@ services:
       qdrant:
         condition: service_started
     volumes:
-      # 挂载知识库目录 (只读) — 默认使用项目同级 knowledge_base，可通过 KB_PATH 覆盖
-      - ${KB_PATH:-../knowledge_base}:/app/knowledge_base:ro
+      # 挂载知识库目录 (只读) — 默认使用项目内 knowledge_base，可通过 KB_PATH 覆盖
+      - ${KB_PATH:-./knowledge_base}:/app/knowledge_base:ro
       # 挂载评估数据集 (可选)
       - ${DATA_PATH:-../data}:/app/data:ro
     healthcheck:

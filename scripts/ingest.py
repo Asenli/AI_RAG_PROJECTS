@@ -35,7 +35,7 @@ from app.services.vector_store import vector_store
 from app.config import settings
 
 # ── Constants ──
-KB_ROOT = os.environ.get("KB_ROOT", os.path.join(os.path.dirname(__file__), "..", "..", "knowledge_base"))
+KB_ROOT = os.environ.get("KB_ROOT", os.path.join(os.path.dirname(__file__), "..", "knowledge_base"))
 BATCH_SIZE = 16  # SiliconFlow max batch size
 MAX_EMBED_CHARS = 480  # Keep Chinese chunks under SiliconFlow embedding input limits.
 DEFAULT_COMPANY_ID = os.environ.get("COMPANY_ID", settings.default_company_id)

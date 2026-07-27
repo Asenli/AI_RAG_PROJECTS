@@ -231,6 +231,16 @@ function formatScore(score: number | undefined | null): string {
 function scoreForStage(item: any, scoreKey: string): number | undefined {
   return item?.[scoreKey] ?? item?.score
 }
+
+function chunkMetadata(chunk: any): string[] {
+  const metadata = chunk.metadata || {}
+  return [
+    metadata.header_path && `标题：${metadata.header_path}`,
+    metadata.module && `模块：${metadata.module}`,
+    metadata.knowledge_type && `类型：${metadata.knowledge_type.toUpperCase()}`,
+    metadata.role && `角色：${metadata.role}`,
+  ].filter(Boolean)
+}
 </script>
 
 <template>
@@ -262,7 +272,7 @@ function scoreForStage(item: any, scoreKey: string): number | undefined {
     <!-- Tab: Upload -->
     <div v-if="activeTab === 'upload'" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <h2 class="text-lg font-semibold text-gray-800 mb-5">上传知识文档</h2>
-      <div class="space-y-4 max-w-lg">
+      <div class="space-y-4 max-w-3xl">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">选择文件 (.md)</label>
           <input
@@ -329,7 +339,7 @@ function scoreForStage(item: any, scoreKey: string): number | undefined {
     <!-- Tab: Split Preview -->
     <div v-if="activeTab === 'split'" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <h2 class="text-lg font-semibold text-gray-800 mb-5">切分预览</h2>
-      <div class="space-y-4 max-w-2xl">
+      <div class="space-y-5">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">粘贴内容</label>
           <textarea
@@ -339,7 +349,7 @@ function scoreForStage(item: any, scoreKey: string): number | undefined {
             placeholder="粘贴Markdown内容..."
           ></textarea>
         </div>
-        <div class="flex items-center space-x-4">
+        <div class="flex flex-wrap items-end gap-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">知识类型</label>
             <select
@@ -362,21 +372,23 @@ function scoreForStage(item: any, scoreKey: string): number | undefined {
         </div>
 
         <!-- Chunk cards -->
-        <div v-if="previewChunks.length > 0" class="mt-4 space-y-3">
-          <p class="text-sm text-gray-500">共 {{ previewChunks.length }} 个块</p>
-          <div
+        <div v-if="previewChunks.length > 0" class="mt-6 border-t border-gray-100 pt-5">
+          <p class="mb-3 text-sm font-medium text-gray-600">切分结果 <span class="font-normal text-gray-400">共 {{ previewChunks.length }} 个块</span></p>
+          <div class="grid grid-cols-1 gap-3 xl:grid-cols-2">
+            <article
             v-for="(chunk, ci) in previewChunks"
             :key="ci"
-            class="border border-gray-200 rounded-lg p-4 bg-gray-50"
+            class="min-w-0 border border-gray-200 rounded-lg bg-gray-50 p-4"
           >
             <div class="flex items-center justify-between mb-2">
               <span class="text-xs font-semibold text-blue-600">块 #{{ ci + 1 }}</span>
-              <span class="text-xs text-gray-400">{{ chunk.char_count || chunk.content?.length || 0 }} 字符</span>
+              <span class="text-xs text-gray-400">{{ chunk.length || chunk.char_count || chunk.content?.length || chunk.text?.length || 0 }} 字符</span>
             </div>
-            <p class="text-sm text-gray-700 whitespace-pre-wrap">{{ chunk.content || chunk.text || chunk.text_preview }}</p>
-            <div v-if="chunk.metadata" class="mt-2 text-xs text-gray-400">
-              元数据: {{ JSON.stringify(chunk.metadata) }}
+            <p class="max-h-48 overflow-y-auto pr-1 text-sm leading-6 text-gray-700 whitespace-pre-wrap">{{ chunk.content || chunk.text || chunk.text_preview }}</p>
+            <div v-if="chunkMetadata(chunk).length" class="mt-3 flex flex-wrap gap-1.5">
+              <span v-for="item in chunkMetadata(chunk)" :key="item" class="rounded bg-white px-2 py-1 text-xs text-gray-500 ring-1 ring-gray-200">{{ item }}</span>
             </div>
+            </article>
           </div>
         </div>
       </div>
@@ -385,7 +397,7 @@ function scoreForStage(item: any, scoreKey: string): number | undefined {
     <!-- Tab: Search Test -->
     <div v-if="activeTab === 'search'" class="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <h2 class="text-lg font-semibold text-gray-800 mb-5">检索测试</h2>
-      <div class="space-y-3 max-w-2xl">
+      <div class="space-y-3">
         <div>
           <label class="block text-sm font-medium text-gray-700 mb-1">查询</label>
           <input
@@ -395,7 +407,7 @@ function scoreForStage(item: any, scoreKey: string): number | undefined {
             placeholder="输入查询文本..."
           />
         </div>
-        <div class="flex items-center space-x-4">
+        <div class="flex flex-wrap items-end gap-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-1">角色</label>
             <select

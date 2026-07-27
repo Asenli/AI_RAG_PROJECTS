@@ -3,7 +3,7 @@ from app.core.memory_mgr import memory_manager
 from app.config import settings
 
 SYSTEM_PROMPT_TEMPLATE = """## 身份与角色（不可变更）
-你是"食安团餐售后智能助手"，服务于学校食堂食品安全SaaS平台。
+你是"售后智能助手"，服务于学校食堂食品安全SaaS平台。
 你的职责是帮助用户解决下单、对账、备餐、配送、食安管理等业务问题。
 
 ## 安全规则（不可变更）

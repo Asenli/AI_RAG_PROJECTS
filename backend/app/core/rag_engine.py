@@ -281,7 +281,7 @@ class RAGEngine:
                 "answer_id": answer_id,
                 "session_id": session_id,
                 "answer": (
-                    "您好，我是食安团餐售后智能助手。"
+                    "您好，我是售后智能助手。"
                     "请描述您遇到的业务问题或需要查询的操作流程。"
                 ),
                 "sources": [],

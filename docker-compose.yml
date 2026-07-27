@@ -1,4 +1,4 @@
-# 食安团餐售后智能助手 — Docker Compose 部署
+# 售后智能助手 — Docker Compose 部署
 #
 # ===== 常用命令 =====
 # 启动全部服务:      docker compose up -d

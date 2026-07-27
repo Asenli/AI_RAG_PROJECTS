@@ -1,4 +1,4 @@
-# 食安团餐售后智能助手 — Conda 环境配置
+# 售后智能助手 — Conda 环境配置
 # 创建: conda env create -f environment.yml
 # 更新: conda env update -f environment.yml
 name: food-safety-assistant

@@ -1,6 +1,6 @@
-# 食安团餐售后智能助手 — Windows 一键启动脚本
+# 售后智能助手 — Windows 一键启动脚本
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  食安团餐售后智能助手 — 启动中..." -ForegroundColor Cyan
+Write-Host "  售后智能助手 — 启动中..." -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 

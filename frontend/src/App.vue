@@ -47,7 +47,7 @@ watch(() => userStore.companyId, (val) => {
           <!-- App Title -->
           <div class="flex items-center space-x-3">
             <span class="text-2xl">🍽️</span>
-            <h1 class="text-lg font-bold text-gray-800">助手</h1>
+            <h1 class="text-lg font-bold text-gray-800">售后智能助手</h1>
             <span class="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full"></span>
           </div>
 

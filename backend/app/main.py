@@ -50,7 +50,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="食安团餐售后智能助手",
+    title="售后智能助手",
     description="Food Safety Group Meal After-Sales Smart Assistant",
     version="1.0.0",
     lifespan=lifespan,

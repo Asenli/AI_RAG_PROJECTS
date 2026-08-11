@@ -1,0 +1,8 @@
+{# 引用格式上下文 — 模型回答时使用 [N] 标注引用来源 #}
+{% for doc in documents %}
+[{{ loop.index }}] {% if doc.doc_title %}《{{ doc.doc_title }}》{% endif %}{% if doc.section %}{{ doc.section }}{% endif %}{% if doc.page %} | p{{ doc.page }}{% endif %}
+{{ doc.text }}
+
+{% endfor %}
+---
+上述文档的引用编号为 [1] 到 [{{ documents | length }}]。请在回答中使用这些编号标注信息来源。

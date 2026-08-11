@@ -1,0 +1,11 @@
+{# 标准上下文格式 — 适合一般法规查询 #}
+{% for doc in documents %}
+## 文档 {{ loop.index }}
+- 来源: {{ doc.doc_title | default("未知来源") }}
+{% if doc.section %}- 章节: {{ doc.section }}{% endif %}
+{% if doc.module %}- 模块: {{ doc.module }}{% endif %}
+{% if doc.page %}- 页码: p{{ doc.page }}{% endif %}
+- 内容:
+{{ doc.text }}
+
+{% endfor %}

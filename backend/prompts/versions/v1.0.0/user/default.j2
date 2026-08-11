@@ -1,0 +1,8 @@
+{% if conversation_history and conversation_history != "无历史摘要" %}
+## 对话历史摘要
+{{ conversation_history }}
+
+---
+{% endif %}
+## 当前问题
+{{ user_query }}

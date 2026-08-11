@@ -1,0 +1,4 @@
+{# 精简上下文格式 — 适合上下文窗口紧张的场景 #}
+{% for doc in documents %}
+[源{{ loop.index }}] {% if doc.doc_title %}{{ doc.doc_title[:6] }}{% endif %}{% if doc.section %} §{{ doc.section[:10] }}{% endif %}: {{ doc.text[:300] }}{% if doc.text | length > 300 %}...{% endif %}
+{% endfor %}

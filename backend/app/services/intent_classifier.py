@@ -7,24 +7,6 @@ import asyncio
 import re
 from app.services.llm_svc import llm_service
 
-INTENT_SYSTEM_PROMPT = """你是一个食安团餐系统的意图分类器。分析用户输入，判断其意图并返回JSON。
-
-意图类型定义：
-- "create_ticket"：用户明确要求创建工单、提交问题、报修、投诉、售后处理、转人工客服等
-- "answer"：用户提出业务相关问题，需要从知识库中查找答案
-- "other"：闲聊、问候、测试、或无法明确归类的问题
-
-判断规则：
-1. 明确提出"生成/创建/提交/帮我开一个工单"、"帮我报修"、"我要投诉"、"售后处理"、"转人工" → create_ticket
-2. 描述系统操作问题、业务咨询、功能使用问题、政策法规查询 → answer
-3. 问候语("你好"、"在吗")、闲聊、测试消息 → other
-
-对于 create_ticket 意图，还需提取：
-- "summary"：工单摘要（≤100字，概括用户需求和问题）
-- "category"：工单分类，可选值：["系统故障", "业务咨询", "数据问题", "投诉建议", "其他"]
-- "priority"：优先级，可选值：["low", "medium", "high", "urgent"]（默认"medium"）
-
-必须返回严格JSON格式，不要添加任何解释文字。"""
 
 
 class IntentClassifier:
@@ -165,10 +147,13 @@ class IntentClassifier:
                 matched="business_question_default",
             )
 
-        messages = [
-            {"role": "system", "content": INTENT_SYSTEM_PROMPT},
-            {"role": "user", "content": f"用户角色：{user_role}\n用户输入：{question}"},
-        ]
+        from app.core.prompt_manager import prompt_manager
+
+        messages = prompt_manager.renderer.render_intent_classifier(
+            template_path="classifier/intent_v1.j2",
+            user_query=question,
+            user_role=user_role,
+        )
         try:
             result = await asyncio.wait_for(
                 llm_service.chat_json(messages, temperature=0.1),

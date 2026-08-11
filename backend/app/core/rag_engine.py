@@ -9,11 +9,11 @@ from app.services.llm_svc import llm_service
 from app.services.input_guard import InputGuard
 from app.services.output_guard import OutputGuard
 from app.services.intent_classifier import intent_classifier
-from app.core.context_assembler import context_assembler
+from app.core.prompt_manager import prompt_manager
+from app.core.memory_mgr import memory_manager
 from app.core.feedback_svc import feedback_service
 from app.core.access_control import role_access_service
 from app.config import settings
-from langchain_core.documents import Document
 
 ROLE_PREFIX_MAP = {
     "finance": "财务对账",
@@ -281,7 +281,7 @@ class RAGEngine:
                 "answer_id": answer_id,
                 "session_id": session_id,
                 "answer": (
-                    "您好，我是食安团餐售后智能助手。"
+                    "您好，我是售后智能助手。"
                     "请描述您遇到的业务问题或需要查询的操作流程。"
                 ),
                 "sources": [],
@@ -450,25 +450,54 @@ class RAGEngine:
         user_role, user_id, school_id, docs, started_at, company_id,
     ) -> dict:
         node_t = time.perf_counter()
-        lc_docs = [
-            Document(page_content=d["text"], metadata=d["metadata"])
-            for d in docs
-        ]
 
-        system_prompt, doc_messages = await context_assembler.assemble(
-            session_id,
-            user_id,
-            user_role,
-            school_id or "",
-            safe_q,
-            lc_docs,
+        # 1. 获取记忆上下文
+        ctx = await memory_manager.get_context_snapshot(
+            session_id=session_id,
+            user_id=user_id,
+            user_role=user_role,
+            school_name=school_id or "",
             company_id=company_id,
         )
 
-        messages = [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": f"用户问题：{safe_q}"},
-        ]
+        # 2. 确定 Prompt 版本（含 A/B 分流）
+        version = prompt_manager.version.resolve(session_id)
+
+        # 3. 组装检索上下文（带元数据）
+        build_mode = settings.context_build_mode
+        raw_context = prompt_manager.builder.build(chunks=docs, mode=build_mode)
+
+        # 4. 安全检查: 清洗 + XML 隔离
+        safe_context, threats = prompt_manager.safety.sanitize_documents(raw_context)
+        if threats:
+            await self._log_trace(
+                trace_id, session_id, user_id, user_role, "safety_filter", 6,
+                input_data={"context_length": len(raw_context)},
+                output_data={"threats_detected": threats},
+                duration_ms=0,
+                status="warning",
+                company_id=company_id,
+            )
+        safe_context = prompt_manager.safety.wrap_documents(safe_context)
+
+        # 5. 渲染最终 messages
+        messages = prompt_manager.renderer.render(
+            system_tpl="system/food_safety_expert.j2",
+            context=safe_context,
+            context_mode=build_mode,
+            user_query=safe_q,
+            variables={
+                "role": user_role,
+                "school_name": school_id or "",
+                "preferred_style": ctx.get("preferred_style", "标准专业"),
+                "user_facts": ctx.get("user_facts", ""),
+                "frequent_questions": ctx.get("frequent_questions", ""),
+                "session_summary": ctx.get("session_summary", ""),
+                "recent_dialog": ctx.get("recent_dialog", ""),
+                "conversation_history": ctx.get("session_summary", ""),
+            },
+            version=version,
+        )
 
         try:
             answer = await self._chat_with_trace(
@@ -528,6 +557,7 @@ class RAGEngine:
         user_role, user_id, school_id, docs, started_at, company_id,
     ) -> dict:
         node_t = time.perf_counter()
+        version = prompt_manager.version.resolve(session_id)
         doc_text = "\n---\n".join([d["text"][:200] for d in docs])
 
         judge_messages = [
@@ -575,23 +605,37 @@ class RAGEngine:
         action = judgment.get("action", "refuse")
 
         if action == "answer" and judgment.get("can_answer"):
-            lc_docs = [
-                Document(page_content=d["text"], metadata=d["metadata"])
-                for d in docs
-            ]
-            system_prompt, _ = await context_assembler.assemble(
-                session_id,
-                user_id,
-                user_role,
-                school_id or "",
-                safe_q,
-                lc_docs,
+            ctx = await memory_manager.get_context_snapshot(
+                session_id=session_id,
+                user_id=user_id,
+                user_role=user_role,
+                school_name=school_id or "",
                 company_id=company_id,
             )
-            messages = [
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"用户问题：{safe_q}"},
-            ]
+
+            version_lc = prompt_manager.version.resolve(session_id)
+            build_mode = settings.context_build_mode
+            raw_context = prompt_manager.builder.build(chunks=docs, mode=build_mode)
+            safe_context, _ = prompt_manager.safety.sanitize_documents(raw_context)
+            safe_context = prompt_manager.safety.wrap_documents(safe_context)
+
+            messages = prompt_manager.renderer.render(
+                system_tpl="system/food_safety_expert.j2",
+                context=safe_context,
+                context_mode=build_mode,
+                user_query=safe_q,
+                variables={
+                    "role": user_role,
+                    "school_name": school_id or "",
+                    "preferred_style": ctx.get("preferred_style", "标准专业"),
+                    "user_facts": ctx.get("user_facts", ""),
+                    "frequent_questions": ctx.get("frequent_questions", ""),
+                    "session_summary": ctx.get("session_summary", ""),
+                    "recent_dialog": ctx.get("recent_dialog", ""),
+                    "conversation_history": ctx.get("session_summary", ""),
+                },
+                version=version_lc,
+            )
             try:
                 answer = await self._chat_with_trace(
                     trace_id=trace_id,

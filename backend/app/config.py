@@ -2,7 +2,9 @@
 import os
 import sys
 import yaml
+from pathlib import Path
 from pydantic_settings import BaseSettings
+from pydantic import Field
 from functools import lru_cache
 
 # ===== 显式加载 .env (早于 pydantic-settings) =====
@@ -112,6 +114,18 @@ class Settings(BaseSettings):
     short_term_max_rounds: int = 5
     session_ttl: int = 1209600  # 14 days
     summary_max_length: int = 500
+
+    # === Prompt Management ===
+    prompt_dir: Path = Field(
+        default_factory=lambda: Path(__file__).parent.parent / "prompts",
+    )
+    default_prompt_version: str = "v1.0.0"
+    prompt_hot_reload: bool = False
+    ab_test_enabled: bool = False
+    ab_test_new_version: str = "v1.1.0"
+    ab_test_traffic_percent: int = 30
+    context_build_mode: str = "standard"
+    safety_filter_enabled: bool = True
 
     class Config:
         env_file = _ENV_PATH or ".env"

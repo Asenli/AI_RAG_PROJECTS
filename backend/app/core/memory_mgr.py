@@ -656,5 +656,55 @@ class MemoryManager:
         except Exception:
             pass
 
+    async def get_context_snapshot(
+        self,
+        session_id: str,
+        user_id: str,
+        user_role: str = "school",
+        school_name: str = "",
+        company_id: str | None = None,
+    ) -> dict:
+        """一次性获取三层记忆的快照，返回适合填充模板的 dict.
+
+        替代原 ContextAssembler.assemble() 中的记忆查询逻辑。
+        """
+        company_id = str(company_id or settings.default_company_id)
+
+        # 短期记忆
+        short_term = await self.get_short_term(session_id, company_id=company_id)
+        recent_dialog = ""
+        for msg in (short_term or [])[-10:]:
+            role_label = "用户" if msg.get("role") == "user" else "助手"
+            recent_dialog += f"{role_label}：{msg.get('content', '')}\n"
+
+        # 中期记忆
+        medium = await self.get_medium_term(session_id, company_id=company_id)
+        session_summary = (medium or {}).get("summary", "无历史摘要")
+
+        # 长期记忆
+        profile = await self.get_user_profile(user_id, company_id=company_id)
+        facts = await self.get_user_facts(user_id, limit=5, company_id=company_id)
+        freq_qs = await self.get_frequent_questions(user_id, limit=3, company_id=company_id)
+
+        user_facts_text = ""
+        if facts:
+            user_facts_text = "; ".join(
+                [f"{f['type']}:{f['content']}" for f in facts]
+            )
+
+        freq_q_text = ""
+        if freq_qs:
+            freq_q_text = "; ".join([q["question"] for q in freq_qs])
+
+        return {
+            "role": user_role,
+            "school_name": school_name or "",
+            "preferred_style": profile.get("preferred_response_style", "标准专业"),
+            "user_facts": user_facts_text,
+            "frequent_questions": freq_q_text,
+            "session_summary": session_summary,
+            "recent_dialog": recent_dialog or "无",
+        }
+
 
 memory_manager = MemoryManager()

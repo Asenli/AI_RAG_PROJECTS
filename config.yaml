@@ -1,4 +1,4 @@
-# 食安团餐售后智能助手 — 非敏感配置
+# 售后智能助手 — 非敏感配置
 # 敏感信息（API Key、密码等）请通过环境变量配置
 
 # === 多租户 ===
@@ -87,3 +87,14 @@ logging:
   level: INFO
   trace_enabled: true
   trace_retention_days: 90
+
+# === Prompt 管理 ===
+prompt:
+  default_version: "v1.0.0"
+  hot_reload: false
+  ab_test:
+    enabled: false
+    new_version: "v1.1.0"
+    traffic_percent: 30
+  context_build_mode: "standard"  # standard | citation | compact
+  safety_filter_enabled: true

@@ -1,4 +1,4 @@
-# 食安团餐售后智能助手 — Docker Compose 部署
+# 售后智能助手 — Docker Compose 部署
 #
 # ===== 常用命令 =====
 # 启动全部服务:      docker compose up -d
@@ -143,6 +143,8 @@ services:
       - SPARSE_EMBEDDING_MODEL=${SPARSE_EMBEDDING_MODEL:-Qdrant/bm25}
       # Knowledge base
       - KB_ROOT=/app/knowledge_base
+      # Prompt templates
+      - PROMPT_DIR=/app/prompts
       # JWT
       - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
       # Runtime
@@ -161,6 +163,8 @@ services:
       - ${KB_PATH:-./knowledge_base}:/app/knowledge_base:ro
       # 挂载评估数据集 (可选)
       - ${DATA_PATH:-../data}:/app/data:ro
+      # 挂载 Prompt 模板目录 — 改 Prompt 无需重建镜像
+      - ./backend/prompts:/app/prompts
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 20s

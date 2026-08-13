@@ -45,6 +45,7 @@ Desktop.ini
 *.log
 logs/
 *.pid
+data/rag_evaluation/reports/
 
 # Docker
 docker-compose.override.yml

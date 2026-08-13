@@ -1,8 +1,8 @@
 <script setup lang="ts">
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, onUnmounted } from 'vue'
 import { adminApi } from '@/api/admin'
 
-const activeTab = ref<'overview' | 'trace' | 'permissions' | 'badcase' | 'review'>('overview')
+const activeTab = ref<'overview' | 'ragas' | 'trace' | 'permissions' | 'badcase' | 'review'>('overview')
 
 // ── Overview tab ──
 const overviewStats = reactive({
@@ -25,6 +25,39 @@ async function loadOverview() {
     console.error('加载概览失败:', e)
   } finally {
     loadingOverview.value = false
+  }
+}
+
+// ── RAGAS evaluation tab ──
+const ragasStatus = ref<any>({ status: 'idle', report: null })
+const ragasLimit = ref(0)
+const includeRagas = ref(true)
+const loadingRagas = ref(false)
+let ragasPoller: number | undefined
+
+async function loadRagasStatus() {
+  try {
+    const res = await adminApi.ragasStatus()
+    ragasStatus.value = res.data
+    if (res.data.status !== 'running' && ragasPoller) {
+      window.clearInterval(ragasPoller)
+      ragasPoller = undefined
+    }
+  } catch (e: any) {
+    console.error('加载 RAGAS 状态失败:', e)
+  }
+}
+
+async function startRagas() {
+  loadingRagas.value = true
+  try {
+    const res = await adminApi.runRagas(ragasLimit.value, includeRagas.value)
+    ragasStatus.value = res.data
+    if (!ragasPoller) ragasPoller = window.setInterval(loadRagasStatus, 1500)
+  } catch (e: any) {
+    alert('启动测试失败: ' + (e.userMessage || e.response?.data?.detail || e.message))
+  } finally {
+    loadingRagas.value = false
   }
 }
 
@@ -289,6 +322,10 @@ function formatDuration(ms?: number): string {
   return `${seconds}秒`
 }
 
+function formatPercent(value?: number): string {
+  return value === undefined || value === null ? '-' : `${(value * 100).toFixed(1)}%`
+}
+
 function truncate(text: string, len: number): string {
   if (!text) return ''
   return text.length > len ? text.slice(0, len) + '...' : text
@@ -328,6 +365,11 @@ onMounted(() => {
   loadPermissions()
   loadBadcases()
   loadReviewFeedbacks()
+  loadRagasStatus()
+})
+
+onUnmounted(() => {
+  if (ragasPoller) window.clearInterval(ragasPoller)
 })
 </script>
 
@@ -339,6 +381,7 @@ onMounted(() => {
         <button
           v-for="tab in [
             { key: 'overview' as const, label: '概览', icon: '📊' },
+            { key: 'ragas' as const, label: 'RAGAS 测试', icon: '🧪' },
             { key: 'trace' as const, label: '链路追踪', icon: '🔗' },
             { key: 'permissions' as const, label: '模块权限', icon: '🔐' },
             { key: 'badcase' as const, label: 'BadCase', icon: '🐛' },
@@ -356,6 +399,69 @@ onMounted(() => {
           <span class="mr-1.5">{{ tab.icon }}</span>{{ tab.label }}
         </button>
       </div>
+    </div>
+
+    <!-- Tab: RAGAS evaluation -->
+    <div v-if="activeTab === 'ragas'" class="space-y-4">
+      <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
+        <div class="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h3 class="text-lg font-semibold text-gray-800">亲子沟通话术评测</h3>
+            <p class="mt-1 text-sm text-gray-500">运行预置用例，检查检索命中、答案覆盖及 RAGAS 指标。</p>
+          </div>
+          <div class="flex flex-wrap items-end gap-3">
+            <label class="block text-sm text-gray-600">
+              <span class="mb-1 block">运行数量</span>
+              <select v-model.number="ragasLimit" :disabled="ragasStatus.status === 'running'" class="border border-gray-300 rounded-md px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                <option :value="0">全部用例</option>
+                <option :value="3">前 3 条</option>
+                <option :value="10">前 10 条</option>
+              </select>
+            </label>
+            <label class="flex items-center gap-2 pb-2 text-sm text-gray-600">
+              <input v-model="includeRagas" :disabled="ragasStatus.status === 'running'" type="checkbox" class="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+              计算 RAGAS 指标
+            </label>
+            <button @click="startRagas" :disabled="loadingRagas || ragasStatus.status === 'running'" class="px-4 py-2 text-sm font-medium bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors">
+              {{ ragasStatus.status === 'running' ? '测试进行中...' : loadingRagas ? '启动中...' : '一键测试' }}
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="ragasStatus.status === 'running'" class="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
+        <div class="flex items-center justify-between text-sm text-gray-600"><span>{{ ragasStatus.message || `正在运行 ${ragasStatus.run_id}` }}</span><span>{{ ragasStatus.completed || 0 }} / {{ ragasStatus.total || 0 }}</span></div>
+        <div class="mt-3 h-2 overflow-hidden rounded bg-gray-100"><div class="h-full bg-blue-600 transition-all" :style="{ width: `${ragasStatus.total ? ((ragasStatus.completed || 0) / ragasStatus.total) * 100 : 0}%` }"></div></div>
+      </div>
+
+      <div v-if="ragasStatus.events?.length" class="bg-slate-950 border border-slate-800 rounded-lg p-4">
+        <div class="mb-2 text-xs font-medium text-slate-300">后端任务日志</div>
+        <div class="max-h-52 overflow-y-auto space-y-1 font-mono text-xs leading-5 text-slate-200">
+          <div v-for="(event, index) in ragasStatus.events" :key="`${event.time}-${index}`"><span class="mr-2 text-slate-500">{{ event.time }}</span>{{ event.message }}</div>
+        </div>
+      </div>
+
+      <div v-if="ragasStatus.status === 'failed'" class="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">{{ ragasStatus.error || '测试任务失败' }}</div>
+
+      <template v-if="ragasStatus.report">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4"><p class="text-xs text-gray-500">完成用例</p><p class="mt-1 text-2xl font-bold text-gray-800">{{ ragasStatus.report.completed }}<span class="text-sm font-normal text-gray-400"> / {{ ragasStatus.report.total }}</span></p></div>
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4"><p class="text-xs text-gray-500">文档命中率</p><p class="mt-1 text-2xl font-bold text-blue-600">{{ formatPercent(ragasStatus.report.source_hit_rate) }}</p></div>
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4"><p class="text-xs text-gray-500">答案覆盖率</p><p class="mt-1 text-2xl font-bold text-green-600">{{ formatPercent(ragasStatus.report.answer_coverage_rate) }}</p></div>
+          <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-4"><p class="text-xs text-gray-500">失败用例</p><p class="mt-1 text-2xl font-bold text-red-600">{{ ragasStatus.report.failed }}</p></div>
+        </div>
+        <div class="bg-white rounded-lg shadow-sm border border-gray-200 p-5">
+          <h4 class="text-sm font-semibold text-gray-800">RAGAS 指标</h4>
+          <div v-if="ragasStatus.report.ragas" class="mt-3 grid grid-cols-2 md:grid-cols-4 gap-3">
+            <div v-for="(value, key) in ragasStatus.report.ragas" :key="String(key)" class="rounded-md bg-gray-50 p-3"><p class="text-xs text-gray-500 break-all">{{ key }}</p><p class="mt-1 text-lg font-semibold text-gray-800">{{ typeof value === 'number' ? value.toFixed(3) : value }}</p></div>
+          </div>
+          <p v-else-if="ragasStatus.report.ragas_error" class="mt-2 text-sm text-yellow-700">RAGAS 未计算：{{ ragasStatus.report.ragas_error }}</p>
+          <p v-else class="mt-2 text-sm text-gray-400">本次未选择 RAGAS 指标计算。</p>
+        </div>
+        <div v-if="ragasStatus.report.failures?.length" class="bg-white rounded-lg shadow-sm border border-gray-200 p-5"><h4 class="text-sm font-semibold text-gray-800">失败详情</h4><div class="mt-3 space-y-2"><div v-for="item in ragasStatus.report.failures" :key="item.id" class="rounded bg-red-50 px-3 py-2 text-sm text-red-700"><span class="font-mono">{{ item.id }}</span>：{{ item.error }}</div></div></div>
+      </template>
+
+      <div v-if="ragasStatus.status === 'idle'" class="rounded-lg border border-dashed border-gray-300 bg-white py-12 text-center text-sm text-gray-400">尚未运行测试。点击“一键测试”开始。</div>
     </div>
 
     <!-- Tab: Overview -->

@@ -5,12 +5,18 @@ from app.core.access_control import role_access_service, ROLE_LABELS
 from app.core.feedback_svc import feedback_service
 from app.services.vector_store import vector_store
 from app.config import settings
+from app.core.ragas_eval_service import ragas_evaluation_service
 
 router = APIRouter()
 
 
 class RoleModulesUpdateRequest(BaseModel):
     modules: list[str] = []
+
+
+class RagasRunRequest(BaseModel):
+    limit: int = 0
+    include_ragas: bool = True
 
 
 def _extract_trace_question(logs) -> str:
@@ -50,6 +56,22 @@ async def admin_stats(company_id: str = Query(settings.default_company_id)):
         "qdrant_mode": "local",
         "feedback_stats": feedback_stats,
     }
+
+
+@router.post("/ragas/run")
+async def run_ragas_evaluation(
+    req: RagasRunRequest,
+    company_id: str = Query(settings.default_company_id),
+):
+    try:
+        return ragas_evaluation_service.start(str(company_id), req.limit, req.include_ragas)
+    except FileNotFoundError as error:
+        return {"status": "failed", "error": str(error)}
+
+
+@router.get("/ragas/status")
+async def ragas_evaluation_status():
+    return ragas_evaluation_service.status()
 
 
 @router.get("/role-modules")

@@ -1,8 +1,12 @@
 """Sparse embedding service — Qdrant BM25 vectors via FastEmbed."""
 import logging
+import os
 from typing import Iterable
 
 from qdrant_client.models import SparseVector
+
+# HuggingFace 国内镜像（必须在 import fastembed 之前设置）
+os.environ.setdefault("HF_ENDPOINT", "https://hf-mirror.com")
 
 from app.config import settings
 

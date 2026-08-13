@@ -1,9 +1,15 @@
-# 食安团餐售后智能助手
+# 售后智能助手
 
 面向学校食堂、教育局、食堂人员、财务、配送商等角色的售后智能问答系统。项目支持知识库检索问答、工单草稿、反馈审核、BadCase 管理、链路追踪、多租户隔离、角色模块权限配置和会话历史持久化。
 
 ## 项目实现
 
+
+![alt text](image.png)
+![alt text](image-1.png)
+![alt text](image-2.png)
+![alt text](image-3.png)
+![alt text](image-4.png)
 ### 整体架构
 
 ```text

@@ -33,11 +33,11 @@ from app.services.embedding_svc import embedding_service
 from app.services.sparse_embedding_svc import sparse_embedding_service
 from app.services.vector_store import vector_store
 from app.config import settings
+from app.services.chunking import split_text_by_tokens, token_count
 
 # ── Constants ──
 KB_ROOT = os.environ.get("KB_ROOT", os.path.join(os.path.dirname(__file__), "..", "knowledge_base"))
 BATCH_SIZE = 16  # SiliconFlow max batch size
-MAX_EMBED_CHARS = 480  # Keep Chinese chunks under SiliconFlow embedding input limits.
 DEFAULT_COMPANY_ID = os.environ.get("COMPANY_ID", settings.default_company_id)
 ROLE_MAP = {
     "education_bureau": "education_bureau",
@@ -54,48 +54,16 @@ ROLE_MAP = {
 }
 
 
-def split_long_text(text: str, max_chars: int = MAX_EMBED_CHARS) -> list[str]:
-    """Split long text into embedding-safe chunks, preferring paragraph breaks."""
-    text = text.strip()
-    if len(text) <= max_chars:
-        return [text]
-
-    parts = []
-    current = ""
-    blocks = [b.strip() for b in re.split(r"\n\s*\n", text) if b.strip()]
-
-    for block in blocks:
-        if len(block) > max_chars:
-            if current:
-                parts.append(current.strip())
-                current = ""
-            for start in range(0, len(block), max_chars):
-                parts.append(block[start : start + max_chars].strip())
-            continue
-
-        candidate = f"{current}\n\n{block}".strip() if current else block
-        if len(candidate) <= max_chars:
-            current = candidate
-        else:
-            if current:
-                parts.append(current.strip())
-            current = block
-
-    if current:
-        parts.append(current.strip())
-
-    return [p for p in parts if p]
-
-
 def split_long_chunks(chunks: list[dict]) -> list[dict]:
     """Split chunks that are too long for the embedding API."""
     split_chunks = []
 
     for chunk in chunks:
         text = chunk["text"].strip()
-        parts = split_long_text(text)
+        parts = split_text_by_tokens(text)
         if len(parts) == 1:
             chunk["metadata"]["chunk_index"] = len(split_chunks)
+            chunk["metadata"]["chunk_tokens"] = token_count(parts[0])
             split_chunks.append(chunk)
             continue
 
@@ -105,6 +73,7 @@ def split_long_chunks(chunks: list[dict]) -> list[dict]:
             metadata["chunk_part"] = part_index + 1
             metadata["chunk_parts"] = len(parts)
             metadata["chunk_index"] = len(split_chunks)
+            metadata["chunk_tokens"] = token_count(part)
             metadata["header_path"] = (
                 f"{metadata.get('header_path', '')}（片段 {part_index + 1}/{len(parts)}）"
             )

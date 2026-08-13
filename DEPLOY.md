@@ -1,4 +1,4 @@
-# 食安团餐售后智能助手部署说明
+# 售后智能助手部署说明
 
 当前项目不需要本地 GPU。LLM 使用 DeepSeek 官方 API，Embedding 和 Rerank 使用 SiliconFlow，向量库使用 Qdrant dense + BM25 hybrid schema。
 

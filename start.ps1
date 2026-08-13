@@ -1,8 +1,14 @@
-# 食安团餐售后智能助手 — Windows 一键启动脚本
+# 售后智能助手 — Windows 一键启动脚本
 Write-Host "========================================" -ForegroundColor Cyan
-Write-Host "  食安团餐售后智能助手 — 启动中..." -ForegroundColor Cyan
+Write-Host "  售后智能助手 — 启动中..." -ForegroundColor Cyan
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
+
+$backendPort = 5002
+if (Get-NetTCPConnection -LocalPort $backendPort -State Listen -ErrorAction SilentlyContinue) {
+    $backendPort = 5003
+    Write-Host "端口 5002 已被占用，后端将使用端口 $backendPort" -ForegroundColor Yellow
+}
 
 # Load .env for child processes when present
 $envFile = Join-Path $PSScriptRoot ".env"
@@ -32,14 +38,16 @@ if ($missing.Count -gt 0) {
 }
 
 # Start Backend
-Write-Host "[1/2] 启动 FastAPI 后端 (端口 5002)..." -ForegroundColor Green
+Write-Host "[1/2] 启动 FastAPI 后端 (端口 $backendPort)..." -ForegroundColor Green
 Start-Process powershell -ArgumentList @"
     -NoExit -Command `
     cd '$PSScriptRoot\backend'; `
+    `$env:PYTHONUNBUFFERED='1'; `
     pip install -r requirements.txt -q; `
-    Write-Host 'FastAPI running at http://localhost:5002'; `
-    Write-Host 'API Docs at http://localhost:5002/docs'; `
-    uvicorn app.main:app --reload --host 0.0.0.0 --port 5002
+    Write-Host 'FastAPI running at http://localhost:$backendPort'; `
+    Write-Host 'API Docs at http://localhost:$backendPort/docs'; `
+    Write-Host 'Request and RAGAS logs will be shown below'; `
+    uvicorn app.main:app --host 0.0.0.0 --port $backendPort --log-level info --access-log
 "@
 
 Start-Sleep -Seconds 3
@@ -49,6 +57,7 @@ Write-Host "[2/2] 启动 Vue 前端开发服务 (端口 5173)..." -ForegroundCol
 Start-Process powershell -ArgumentList @"
     -NoExit -Command `
     cd '$PSScriptRoot\frontend'; `
+    `$env:BACKEND_PORT='$backendPort'; `
     npm install; `
     Write-Host 'Vue Dev Server running at http://localhost:5173'; `
     npm run dev
@@ -58,8 +67,8 @@ Write-Host ""
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host "  启动完成!" -ForegroundColor Green
 Write-Host "  前端: http://localhost:5173" -ForegroundColor Green
-Write-Host "  后端: http://localhost:5002" -ForegroundColor Green
-Write-Host "  API文档: http://localhost:5002/docs" -ForegroundColor Green
+Write-Host "  后端: http://localhost:$backendPort" -ForegroundColor Green
+Write-Host "  API文档: http://localhost:$backendPort/docs" -ForegroundColor Green
 Write-Host "========================================" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "按任意键退出..."

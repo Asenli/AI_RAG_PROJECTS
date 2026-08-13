@@ -53,4 +53,12 @@ export const adminApi = {
       params: { company_id: companyId() },
     })
   },
+  runRagas(limit: number, includeRagas: boolean) {
+    return api.post('/admin/ragas/run', { limit, include_ragas: includeRagas }, {
+      params: { company_id: companyId() },
+    })
+  },
+  ragasStatus() {
+    return api.get('/admin/ragas/status')
+  },
 }

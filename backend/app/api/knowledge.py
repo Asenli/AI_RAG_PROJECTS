@@ -10,12 +10,12 @@ from app.services.sparse_embedding_svc import sparse_embedding_service
 from app.services.knowledge_guard import KnowledgeGuard
 from app.core.rag_engine import rag_engine
 from app.config import settings
+from app.services.chunking import split_text_by_tokens, token_count
 
 router = APIRouter()
 
 # In-memory document registry (production: PostgreSQL table)
 doc_registry: dict = {}
-MAX_EMBED_CHARS = 480
 DEFAULT_COMPANY_ID = settings.default_company_id
 
 
@@ -27,44 +27,14 @@ class SplitPreviewRequest(BaseModel):
     company_id: str = DEFAULT_COMPANY_ID
 
 
-def _split_long_text(text: str, max_chars: int = MAX_EMBED_CHARS) -> list[str]:
-    text = text.strip()
-    if len(text) <= max_chars:
-        return [text]
-
-    parts = []
-    current = ""
-    blocks = [b.strip() for b in re.split(r"\n\s*\n", text) if b.strip()]
-
-    for block in blocks:
-        if len(block) > max_chars:
-            if current:
-                parts.append(current.strip())
-                current = ""
-            for start in range(0, len(block), max_chars):
-                parts.append(block[start : start + max_chars].strip())
-            continue
-
-        candidate = f"{current}\n\n{block}".strip() if current else block
-        if len(candidate) <= max_chars:
-            current = candidate
-        else:
-            if current:
-                parts.append(current.strip())
-            current = block
-
-    if current:
-        parts.append(current.strip())
-    return [p for p in parts if p]
-
-
 def _split_long_chunks(chunks: list[dict]) -> list[dict]:
     split_chunks = []
     for chunk in chunks:
-        parts = _split_long_text(chunk["text"])
+        parts = split_text_by_tokens(chunk["text"])
         if len(parts) == 1:
             if "metadata" in chunk:
                 chunk["metadata"]["chunk_index"] = len(split_chunks)
+                chunk["metadata"]["chunk_tokens"] = token_count(parts[0])
             split_chunks.append(chunk)
             continue
         for part_index, part in enumerate(parts):
@@ -74,6 +44,7 @@ def _split_long_chunks(chunks: list[dict]) -> list[dict]:
                 metadata["chunk_part"] = part_index + 1
                 metadata["chunk_parts"] = len(parts)
                 metadata["chunk_index"] = len(split_chunks)
+                metadata["chunk_tokens"] = token_count(part)
                 metadata["header_path"] = (
                     f"{metadata.get('header_path', '')}（片段 {part_index + 1}/{len(parts)}）"
                 )

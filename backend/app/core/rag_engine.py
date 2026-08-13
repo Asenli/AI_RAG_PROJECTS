@@ -564,7 +564,7 @@ class RAGEngine:
             {
                 "role": "system",
                 "content": (
-                    "你是一个食安团餐系统的智能助手。用户提出了一个问题，知识库中可能没有直接答案。\n"
+                    "你是一个售后智能助手。用户提出了一个问题，知识库中可能没有直接答案。\n"
                     "请判断问题类型，再决定处理方式。\n"
                     "返回JSON格式：\n"
                     '{"question_type":"operation|policy|finance|food_safety|business_data|after_sales|other",'

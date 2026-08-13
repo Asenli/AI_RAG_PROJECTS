@@ -44,6 +44,8 @@ Vue/Vite 前端
 - 历史会话：会话列表持久化，点击历史会话可回显并继续问答
 - 多租户：默认 `company_id=1`，知识库、问答、工单、反馈、链路、会话按租户隔离
 - 权限配置：管理后台支持配置角色可访问的知识库模块
+- 提示词管理：System Prompt 等通过 Jinja2 模板版本化，支持 A/B 测试与热重载
+- RAGAS 评测：管理后台内置评测服务，另有命令行端到端评测脚本
 
 ## 核心技术点
 
@@ -77,7 +79,7 @@ bm25: 稀疏向量
 
 ### 3. 知识库切分
 
-当前没有使用 LangChain 的 `RecursiveCharacterTextSplitter`，而是自定义 Markdown 规则切分。
+不使用 LangChain 的 `RecursiveCharacterTextSplitter`，而是自定义 Markdown 规则 + token 感知切分。
 
 默认知识库目录：
 
@@ -89,9 +91,9 @@ knowledge_base/
 
 切分规则：
 
-- FAQ：优先按 `## Q1:`、`## Q2:` 切分
-- 操作手册：优先按 `### 1.`、`### 2.` 切分
-- 超长 chunk：按段落切分，仍过长时按 `480` 字符兜底切分
+- FAQ：按 `## Q1:`、`## Q2:` 问答对切分（每个问答对一个 chunk）
+- 操作手册：按 `### 1.`、`### 2.` 章节切分
+- 超长 chunk：用 BGE tokenizer 按 400 token（50 token 重叠）二次切分，避免超过 embedding 上限
 
 ### 4. 多租户隔离
 
@@ -134,6 +136,28 @@ company_id=1
 
 问答检索时会根据当前用户角色生成模块过滤条件。管理员默认全模块可见。保存权限后，不需要重新入库，后续新问题立即生效。
 
+### 7. Prompt 管理与版本化
+
+System Prompt 等提示词不再硬编码，统一用 Jinja2 模板 + 版本目录管理：
+
+```text
+backend/prompts/
+  system/food_safety_expert.j2        # 主 System Prompt（根目录兜底）
+  classifier/intent_v1.j2             # 意图分类器
+  user/default.j2                     # 用户消息模板
+  context/standard.j2                 # 上下文组装（standard/citation/compact）
+  versions/v1.0.0/                    # 版本化模板（实际生效）
+```
+
+核心能力：
+
+- 版本切换：`prompt.default_version` 指定默认版本，回退链为「指定版本 → 默认版本 → 根目录兜底」
+- A/B 测试：`prompt.ab_test.enabled` 开启后，按 `session_id` 哈希把部分流量分流到 `new_version`
+- 热重载：`prompt.hot_reload=true` 时每次读取模板文件，开发调试无需重启
+- 上下文组装三种模式：`standard` / `citation`（带 [N] 引用标注）/ `compact`（精简）
+
+Prompt 注入防护共 4 层：输入清洗、提示词结构隔离、知识库内容清洗、输出泄露检测。
+
 ## 已做优化点
 
 - 意图识别规则优先：
@@ -152,6 +176,16 @@ company_id=1
 - Qdrant payload 增加 `company_id`，支持多租户过滤
 - 角色模块权限改为可配置，并接入实际 RAG 检索
 - 会话历史完整持久化，但 LLM 只使用最近 5 轮上下文，控制 token 成本
+
+## RAGAS 评测
+
+项目内置评测能力，用于回归验证检索与回答质量：
+
+- 管理后台 RAGAS 看板：`backend/app/core/ragas_eval_service.py` 提供进程内评测服务
+- 命令行端到端评测：`scripts/run_ragas_eval.py`、`scripts/run_parenting_ragas_eval.ps1`
+- 数据集生成：`scripts/generate_parenting_ragas_dataset.py`
+
+评测数据集位于 `data/rag_evaluation/`（含 RAGAS 所需的 `question` / `ground_truth` / `reference_contexts`），RAGAS 依赖见 `requirements-eval.txt`。快速上手见 `data/rag_evaluation/README.md`。
 
 ## Windows 本地执行
 
